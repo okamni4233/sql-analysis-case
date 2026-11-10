@@ -60,3 +60,15 @@ INSERT INTO payments (payment_id, order_id, payment_date, amount, method) VALUES
 (4, 5, '2023-06-25', 29970,  'cash'),
 (5, 6, '2023-07-05', 39980,  'credit_card'),
 (6, 7, '2023-07-15', 100980, 'credit_card');
+
+
+
+-- Los INSERT anteriores usan IDs explícitos para que las claves foráneas sean
+-- legibles. Eso no avanza las secuencias de las columnas SERIAL, así que se
+-- sincronizan aquí; sin este paso, el siguiente INSERT sin ID fallaría por
+-- clave duplicada.
+SELECT setval(pg_get_serial_sequence('customers',   'customer_id'),   (SELECT MAX(customer_id)   FROM customers));
+SELECT setval(pg_get_serial_sequence('products',    'product_id'),    (SELECT MAX(product_id)    FROM products));
+SELECT setval(pg_get_serial_sequence('orders',      'order_id'),      (SELECT MAX(order_id)      FROM orders));
+SELECT setval(pg_get_serial_sequence('order_items', 'order_item_id'), (SELECT MAX(order_item_id) FROM order_items));
+SELECT setval(pg_get_serial_sequence('payments',    'payment_id'),    (SELECT MAX(payment_id)    FROM payments));
