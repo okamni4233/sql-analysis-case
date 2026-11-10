@@ -69,12 +69,21 @@ ORDER BY month;
 
 
 
--- Clientes activos (últimos 90 días)
-WITH recent_orders AS (
-    SELECT DISTINCT customer_id
-    FROM orders
-    WHERE status = 'completed'
-      AND order_date >= CURRENT_DATE - INTERVAL '90 days'
+-- Clientes activos (con al menos un pedido completado en los 90 días previos
+-- a la fecha de referencia)
+-- Los datos de muestra van de abril a julio de 2023, así que se usa una fecha
+-- de referencia fija (2023-07-31) en lugar de CURRENT_DATE; con la fecha
+-- actual la consulta no devolvería filas.
+WITH params AS (
+    SELECT DATE '2023-07-31' AS reference_date
+),
+recent_orders AS (
+    SELECT DISTINCT o.customer_id
+    FROM orders o
+    CROSS JOIN params
+    WHERE o.status = 'completed'
+      AND o.order_date >  params.reference_date - INTERVAL '90 days'
+      AND o.order_date <= params.reference_date
 )
 SELECT
     c.customer_id,
@@ -82,7 +91,8 @@ SELECT
     c.city,
     c.region
 FROM customers c
-JOIN recent_orders r ON c.customer_id = r.customer_id;
+JOIN recent_orders r ON c.customer_id = r.customer_id
+ORDER BY c.customer_id;
 
 
 
