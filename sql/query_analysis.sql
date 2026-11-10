@@ -150,3 +150,46 @@ SELECT *
 FROM product_sales
 WHERE total_units < 3
 ORDER BY total_units, product_id;
+
+
+
+-- Conciliación de pagos: total del pedido vs. total pagado
+-- Incluye todos los pedidos. Un pedido completado debería tener diferencia 0;
+-- un pedido cancelado no debería tener pagos.
+WITH order_totals AS (
+    SELECT
+        o.order_id,
+        o.status,
+        SUM(oi.quantity * oi.unit_price) AS order_total
+    FROM orders o
+    JOIN order_items oi ON o.order_id = oi.order_id
+    GROUP BY o.order_id, o.status
+),
+order_payments AS (
+    SELECT
+        order_id,
+        SUM(amount) AS paid_total
+    FROM payments
+    GROUP BY order_id
+)
+SELECT
+    t.order_id,
+    t.status,
+    t.order_total,
+    COALESCE(p.paid_total, 0)                 AS paid_total,
+    t.order_total - COALESCE(p.paid_total, 0) AS difference
+FROM order_totals t
+LEFT JOIN order_payments p ON t.order_id = p.order_id
+ORDER BY t.order_id;
+
+
+
+-- Monto pagado por método de pago y su participación
+SELECT
+    method,
+    COUNT(*)                                            AS payments,
+    SUM(amount)                                         AS paid_amount,
+    ROUND(100.0 * SUM(amount) / SUM(SUM(amount)) OVER (), 1) AS pct_of_total
+FROM payments
+GROUP BY method
+ORDER BY paid_amount DESC;
