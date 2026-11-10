@@ -123,18 +123,20 @@ FROM orders;
 
 
 -- Productos con pocas ventas
+-- Solo cuenta unidades de pedidos completados. Los productos sin ventas
+-- aparecen con 0. El umbral (menos de 3 unidades) es un ejemplo ajustado al
+-- tamaño de los datos de muestra.
 WITH product_sales AS (
     SELECT
         p.product_id,
         p.product_name,
-        SUM(oi.quantity) AS total_units
+        COALESCE(SUM(oi.quantity) FILTER (WHERE o.status = 'completed'), 0) AS total_units
     FROM products p
     LEFT JOIN order_items oi ON p.product_id = oi.product_id
     LEFT JOIN orders o       ON oi.order_id = o.order_id
-                              AND o.status = 'completed'
     GROUP BY p.product_id, p.product_name
 )
 SELECT *
 FROM product_sales
-WHERE total_units IS NULL OR total_units < 10
-ORDER BY total_units NULLS FIRST;
+WHERE total_units < 3
+ORDER BY total_units, product_id;
