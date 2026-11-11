@@ -2,15 +2,58 @@
 
 > **English summary.** A small PostgreSQL case study: a five-table e-commerce schema (customers, products, orders, order items, payments), hand-written sample data and eleven analytical queries covering sales, rankings with window functions, moving averages, active customers, cancellation rate, low-selling products and payment reconciliation. The dataset is tiny and synthetic on purpose; the goal is to show query technique, not business findings.
 
-## Qué contiene
+Once consultas analíticas en PostgreSQL sobre el modelo de datos de una tienda online: ventas, clientes, productos, canales y conciliación de pagos.
 
-| Archivo | Contenido |
-|---|---|
-| `sql/schema.sql` | Esquema de 5 tablas con claves primarias y foráneas. |
-| `sql/sample_data.sql` | Datos de muestra escritos a mano: 5 clientes, 6 productos, 7 pedidos (1 cancelado), 10 líneas de pedido y 6 pagos, de abril a julio de 2023. |
-| `sql/query_analysis.sql` | 11 consultas analíticas. |
+## Resultado principal
 
-## Consultas y resultados
+**Las 11 consultas se ejecutan sin errores en PostgreSQL 16 y sus resultados están verificados uno a uno** contra los datos de muestra. Por ejemplo, la conciliación de pagos confirma que los 6 pedidos completados cuadran con lo pagado (318.870 en total) y que el pedido cancelado no tiene pagos.
+
+```mermaid
+erDiagram
+    customers ||--o{ orders : realiza
+    orders ||--|{ order_items : contiene
+    products ||--o{ order_items : "aparece en"
+    orders ||--o{ payments : "se paga con"
+
+    customers {
+        int customer_id PK
+        varchar full_name
+        varchar email
+        varchar city
+        varchar region
+        date signup_date
+    }
+    products {
+        int product_id PK
+        varchar product_name
+        varchar category
+        numeric unit_price
+        boolean active
+    }
+    orders {
+        int order_id PK
+        int customer_id FK
+        date order_date
+        varchar status
+        varchar channel
+    }
+    order_items {
+        int order_item_id PK
+        int order_id FK
+        int product_id FK
+        int quantity
+        numeric unit_price
+    }
+    payments {
+        int payment_id PK
+        int order_id FK
+        date payment_date
+        numeric amount
+        varchar method
+    }
+```
+
+### Consultas y resultados
 
 Resultados obtenidos al ejecutar los tres archivos en PostgreSQL 16 sobre una base vacía. Los montos están en pesos chilenos.
 
@@ -28,17 +71,16 @@ Resultados obtenidos al ejecutar los tres archivos en PostgreSQL 16 sobre una ba
 | 10 | Conciliación de pagos por pedido | Dos CTE, `LEFT JOIN` | Los 6 pedidos completados cuadran (diferencia 0); el cancelado no tiene pagos |
 | 11 | Monto pagado por método | Ventana sobre agregado | Tarjeta de crédito 73,4 % · débito 17,2 % · efectivo 9,4 % |
 
-## Supuestos
+### Supuestos
 
 - **Venta** significa pedido con estado `completed`; los cancelados se excluyen de todos los indicadores de venta.
 - **Fecha de referencia.** "Clientes activos" usa una fecha fija, `2023-07-31`, declarada al inicio de la consulta. Los datos terminan en julio de 2023, por lo que con la fecha actual la consulta no devolvería filas.
 - **Umbral de pocas ventas.** Menos de 3 unidades. Es un valor de ejemplo ajustado al tamaño de los datos.
 
-## Limitaciones
+## Dataset
 
-- Los datos son sintéticos y mínimos: sirven para comprobar que las consultas son correctas, no para sacar conclusiones de negocio.
-- El promedio móvil de la consulta 4 promedia los tres últimos meses **con ventas**, no tres meses de calendario: mayo no tiene pedidos y no aparece. Para un promedio de calendario habría que generar la serie de meses con `generate_series`.
-- No hay pruebas automatizadas; la verificación fue manual.
+- **Fuente:** datos sintéticos escritos a mano para este caso (`sql/sample_data.sql`); no provienen de una empresa real.
+- **Tamaño:** 5 clientes, 6 productos, 7 pedidos (1 cancelado), 10 líneas de pedido y 6 pagos, de abril a julio de 2023. Montos en pesos chilenos.
 
 ## Cómo reproducirlo
 
@@ -47,6 +89,22 @@ createdb sql_case
 psql sql_case -f sql/schema.sql -f sql/sample_data.sql
 psql sql_case -f sql/query_analysis.sql
 ```
+
+## Estructura
+
+```
+sql/
+  schema.sql            esquema de 5 tablas con claves primarias y foráneas
+  sample_data.sql       datos de muestra y ajuste de secuencias
+  query_analysis.sql    las 11 consultas
+```
+
+## Limitaciones y próximos pasos
+
+- Los datos son sintéticos y mínimos: sirven para comprobar que las consultas son correctas, no para sacar conclusiones de negocio.
+- El promedio móvil de la consulta 4 promedia los tres últimos meses **con ventas**, no tres meses de calendario: mayo no tiene pedidos y no aparece. Para un promedio de calendario habría que generar la serie de meses con `generate_series`.
+- No hay pruebas automatizadas; la verificación fue manual.
+- Próximos pasos: generar datos sintéticos de mayor volumen y agregar pruebas automáticas que comparen cada consulta con su resultado esperado.
 
 ## Stack
 
